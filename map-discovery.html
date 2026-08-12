@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>No Bad Days Club — Discover</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600&family=Space+Mono:wght@400;700&display=swap');
+
+  :root{
+    --ink:#12181F;
+    --ink-soft:#1C2530;
+    --ink-softer:#232E3B;
+    --cloud:#EDEAE2;
+    --cloud-dim:#9B9890;
+    --amber:#FFB627;
+    --signal:#4CC9A0;
+    --trail:#8B7FD9;
+    --danger:#FF6B5E;
+  }
+
+  *{box-sizing:border-box; margin:0; padding:0;}
+
+  html,body{
+    background:var(--ink);
+    color:var(--cloud);
+    font-family:'Inter', sans-serif;
+  }
+
+  /* ---------- HEADER ---------- */
+  .header{
+    position:sticky;
+    top:0;
+    z-index:30;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding:14px 20px;
+    background:var(--ink);
+    border-bottom:1px solid rgba(237,234,226,0.08);
+  }
+
+  .wordmark{
+    font-family:'Space Grotesk', sans-serif;
+    font-weight:700;
+    font-size:15px;
+    letter-spacing:0.02em;
+    display:flex;
+    align-items:center;
+    gap:8px;
+  }
+  .wordmark .dot{
+    width:8px; height:8px; border-radius:50%;
+    background:var(--signal);
+    box-shadow:0 0 8px var(--signal);
+  }
+  .wordmark span.sub{
+    font-family:'Space Mono', monospace;
+    font-weight:400;
+    font-size:10px;
+    color:var(--cloud-dim);
+    text-transform:uppercase;
+    letter-spacing:0.08em;
+  }
+
+  .stats{ display:flex; gap:10px; }
+  .pill{
+    background:var(--ink-soft);
+    border:1px solid rgba(237,234,226,0.1);
+    border-radius:20px;
+    padding:7px 12px;
+    display:flex;
+    align-items:center;
+    gap:6px;
+    font-family:'Space Mono', monospace;
+    font-size:12px;
+    font-weight:700;
+  }
+  .pill.xp{ color:var(--amber); }
+  .pill.streak{ color:var(--signal); }
+
+  /* ---------- MAP HERO (part of page, not fullscreen) ---------- */
+  .map-hero{
+    position:relative;
+    height:52vh;
+    min-height:320px;
+    width:100%;
+  }
+  #map{ position:absolute; inset:0; z-index:0; filter: saturate(0.85) contrast(1.05); }
+  .map-tint{
+    position:absolute;
+    inset:0;
+    z-index:1;
+    pointer-events:none;
+    background: linear-gradient(180deg, rgba(18,24,31,0.35) 0%, rgba(18,24,31,0.0) 22%, rgba(18,24,31,0.0) 70%, rgba(18,24,31,0.9) 100%);
+  }
+  .map-hint{
+    position:absolute;
+    bottom:14px; left:50%;
+    transform:translateX(-50%);
+    z-index:2;
+    font-family:'Space Mono', monospace;
+    font-size:10px;
+    color:var(--cloud-dim);
+    background:rgba(18,24,31,0.6);
+    padding:5px 10px;
+    border-radius:20px;
+    pointer-events:none;
+  }
+
+  /* ---------- PIN ---------- */
+  .pin{
+    width:36px; height:36px;
+    border-radius:50%;
+    background:var(--cloud);
+    border:2px solid var(--ink);
+    display:flex; align-items:center; justify-content:center;
+    font-size:16px;
+    box-shadow:0 3px 10px rgba(0,0,0,0.4);
+    cursor:pointer;
+    transition:transform 0.15s ease;
+    position:relative;
+  }
+  .pin:hover{ transform:scale(1.12); }
+  .pin.selected{ background:var(--signal); border-color:var(--ink); }
+  .pin .xp-badge{
+    position:absolute; top:-8px; right:-10px;
+    background:var(--amber); color:var(--ink);
+    font-family:'Space Mono', monospace;
+    font-size:9px; font-weight:700;
+    padding:2px 5px; border-radius:8px; line-height:1.2;
+  }
+
+  /* ---------- CONTENT SECTIONS (below map, normal scroll) ---------- */
+  .content{
+    max-width:640px;
+    margin:0 auto;
+    padding:22px 20px 60px;
+  }
+
+  .section-heading{
+    display:flex;
+    align-items:baseline;
+    justify-content:space-between;
+    margin-bottom:12px;
+  }
+  .section-heading h2{
+    font-family:'Space Grotesk', sans-serif;
+    font-size:17px;
+    font-weight:700;
+  }
+  .section-heading .count{
+    font-family:'Space Mono', monospace;
+    font-size:11px;
+    color:var(--cloud-dim);
+  }
+
+  .route-section{ margin-bottom:34px; }
+  .route-empty{
+    border:1.5px dashed rgba(237,234,226,0.15);
+    border-radius:14px;
+    padding:22px 16px;
+    text-align:center;
+    color:var(--cloud-dim);
+    font-size:13px;
+  }
+  .route-list{ display:flex; flex-direction:column; gap:8px; }
+
+  .route-footer{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-top:12px;
+    padding:12px 14px;
+    background:var(--ink-soft);
+    border-radius:12px;
+    border:1px solid rgba(237,234,226,0.08);
+  }
+  .route-footer .sub{ font-family:'Space Mono', monospace; font-size:11px; color:var(--cloud-dim); }
+  .route-footer .total-xp{ font-family:'Space Mono', monospace; color:var(--amber); font-weight:700; font-size:15px; }
+
+  .item{
+    display:flex;
+    align-items:center;
+    gap:12px;
+    background:var(--ink-soft);
+    border-radius:14px;
+    padding:12px 14px;
+    border:1px solid rgba(237,234,226,0.06);
+  }
+  .item .icon{
+    width:40px; height:40px; border-radius:50%;
+    background:var(--ink-softer);
+    display:flex; align-items:center; justify-content:center;
+    font-size:18px; flex-shrink:0;
+  }
+  .item .info{ flex:1; min-width:0; cursor:pointer; }
+  .item .info h4{ font-family:'Space Grotesk'; font-size:14px; font-weight:700; }
+  .item .info .meta{ font-family:'Space Mono', monospace; font-size:10px; color:var(--cloud-dim); margin-top:3px; }
+
+  .icon-btn{
+    width:34px; height:34px;
+    border-radius:50%;
+    border:1.5px solid rgba(237,234,226,0.15);
+    background:transparent;
+    color:var(--cloud);
+    font-size:16px;
+    cursor:pointer;
+    flex-shrink:0;
+    display:flex; align-items:center; justify-content:center;
+    transition:all 0.15s ease;
+  }
+  .icon-btn.add{ color:var(--signal); border-color:rgba(76,201,160,0.35); }
+  .icon-btn.added{ background:var(--signal); color:var(--ink); border-color:var(--signal); }
+  .icon-btn.remove{ color:var(--danger); border-color:rgba(255,107,94,0.35); }
+
+  /* ---------- TASK DETAIL SHEET (fixed overlay) ---------- */
+  .task-card{
+    position:fixed;
+    left:16px; right:16px;
+    bottom:16px;
+    z-index:50;
+    max-width:608px;
+    margin:0 auto;
+    background:var(--cloud);
+    color:var(--ink);
+    border-radius:18px;
+    padding:16px 18px;
+    box-shadow:0 12px 30px rgba(0,0,0,0.45);
+    transform:translateY(140%);
+    transition:transform 0.28s cubic-bezier(.2,.9,.3,1);
+  }
+  .task-card.open{ transform:translateY(0); }
+  .task-card .row1{ display:flex; justify-content:space-between; align-items:flex-start; gap:10px; }
+  .task-card h3{ font-family:'Space Grotesk', sans-serif; font-size:17px; font-weight:700; }
+  .task-card .meta{ font-family:'Space Mono', monospace; font-size:11px; color:#5b5b52; margin-top:3px; }
+  .task-card .close{ background:none; border:none; font-size:18px; color:#5b5b52; cursor:pointer; line-height:1; }
+  .task-card p.desc{ font-size:13px; color:#3a3a33; margin-top:10px; line-height:1.45; }
+  .task-card .actions{ display:flex; gap:10px; margin-top:14px; }
+  .btn{ flex:1; border:none; border-radius:11px; padding:11px; font-family:'Inter'; font-weight:600; font-size:13px; cursor:pointer; transition:opacity 0.15s ease; }
+  .btn:active{ opacity:0.75; }
+  .btn.primary{ background:var(--ink); color:var(--cloud); }
+  .btn.ghost{ background:transparent; color:var(--ink); border:1.5px solid rgba(18,24,31,0.25); }
+
+  .leaflet-marker-icon{ background:none !important; border:none !important; }
+  .leaflet-container{ background:var(--ink); }
+  .leaflet-control-attribution{ background:rgba(18,24,31,0.6) !important; color:var(--cloud-dim) !important; font-size:9px !important; }
+  .leaflet-control-attribution a{ color:var(--cloud-dim) !important; }
+  .leaflet-control-zoom a{ background:var(--ink-soft) !important; color:var(--cloud) !important; border:none !important; }
+
+  @media (prefers-reduced-motion: reduce){ *{ transition:none !important; } }
+</style>
+</head>
+<body>
+
+<header class="header">
+  <div class="wordmark">
+    <span class="dot"></span>
+    NO BAD DAYS CLUB
+    <span class="sub">Boston</span>
+  </div>
+  <div class="stats">
+    <div class="pill xp">⚡ 1,240 XP</div>
+    <div class="pill streak">🔥 5</div>
+  </div>
+</header>
+
+<section class="map-hero">
+  <div id="map"></div>
+  <div class="map-tint"></div>
+  <div class="map-hint">Scroll down for nearby tasks ↓</div>
+</section>
+
+<div class="content">
+
+  <div class="route-section">
+    <div class="section-heading">
+      <h2>Your route today</h2>
+      <span class="count" id="routeCount">0 stops</span>
+    </div>
+    <div id="routeBody">
+      <div class="route-empty">Add a task from the map or the list below to start building today's route.</div>
+    </div>
+  </div>
+
+  <div class="nearby-section">
+    <div class="section-heading">
+      <h2>Popular nearby</h2>
+      <span class="count" id="nearbyCount">6 tasks</span>
+    </div>
+    <div class="route-list" id="nearbyList"></div>
+  </div>
+
+</div>
+
+<div class="task-card" id="taskCard">
+  <div class="row1">
+    <div>
+      <h3 id="cardTitle">Task name</h3>
+      <div class="meta" id="cardMeta">0.0 mi · 15 min</div>
+    </div>
+    <button class="close" id="cardClose">✕</button>
+  </div>
+  <p class="desc" id="cardDesc">Description goes here.</p>
+  <div class="actions">
+    <button class="btn ghost" id="cardDirections">Directions</button>
+    <button class="btn primary" id="cardAdd">Add to today's route</button>
+  </div>
+</div>
+
+<script>
+  const tasks = [
+    { id:1, name:"Feed the ducks", lat:42.3538, lng:-71.0709, icon:"🦆", xp:60, dist:"0.3 mi", time:"10 min",
+      desc:"Public Garden. Snap a photo near the lagoon before the swan boats start their rounds." },
+    { id:2, name:"Find the Freedom Trail", lat:42.3600, lng:-71.0568, icon:"🧭", xp:90, dist:"0.6 mi", time:"15 min",
+      desc:"Faneuil Hall. Follow the red brick line and check in at the marker out front." },
+    { id:3, name:"North End espresso run", lat:42.3647, lng:-71.0542, icon:"☕", xp:50, dist:"0.9 mi", time:"12 min",
+      desc:"Grab a coffee from a North End spot that isn't on your usual route." },
+    { id:4, name:"Browse Newbury St", lat:42.3505, lng:-71.0810, icon:"🛍️", xp:70, dist:"1.1 mi", time:"18 min",
+      desc:"Walk one full block of Newbury and photograph a storefront that's new to you." },
+    { id:5, name:"Common bench reset", lat:42.3556, lng:-71.0656, icon:"🌳", xp:40, dist:"0.2 mi", time:"8 min",
+      desc:"Boston Common. Sit on any bench for five quiet minutes. No phone." },
+    { id:6, name:"Esplanade sunset", lat:42.3546, lng:-71.0776, icon:"🌇", xp:110, dist:"1.4 mi", time:"20 min",
+      desc:"Charles River Esplanade. Catch the skyline lighting up across the water." }
+  ];
+
+  const map = L.map('map', { zoomControl:false, attributionControl:true, scrollWheelZoom:false })
+    .setView([42.3592, -71.0670], 14);
+  L.control.zoom({ position:'topright' }).addTo(map);
+
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+    attribution:'&copy; OpenStreetMap &copy; CARTO',
+    subdomains:'abcd',
+    maxZoom:19
+  }).addTo(map);
+
+  const markers = {};
+  const selected = new Set();
+  const addedOrder = [];
+  let trailLine = null;
+
+  function pinHTML(task, isSelected){
+    return `<div class="pin${isSelected ? ' selected':''}">${task.icon}<span class="xp-badge">${task.xp}</span></div>`;
+  }
+
+  tasks.forEach(task => {
+    const icon = L.divIcon({ html: pinHTML(task,false), className:'', iconSize:[36,36], iconAnchor:[18,18] });
+    const marker = L.marker([task.lat, task.lng], { icon }).addTo(map);
+    marker.on('click', () => openCard(task));
+    markers[task.id] = marker;
+  });
+
+  function refreshPin(task){
+    markers[task.id].setIcon(L.divIcon({
+      html: pinHTML(task, selected.has(task.id)),
+      className:'', iconSize:[36,36], iconAnchor:[18,18]
+    }));
+  }
+
+  // ---------- Task detail sheet ----------
+  const card = document.getElementById('taskCard');
+  let activeTask = null;
+
+  function openCard(task){
+    activeTask = task;
+    document.getElementById('cardTitle').textContent = task.name;
+    document.getElementById('cardMeta').textContent = `${task.dist} · ${task.time}`;
+    document.getElementById('cardDesc').textContent = task.desc;
+    document.getElementById('cardAdd').textContent = selected.has(task.id) ? "Remove from route" : "Add to today's route";
+    card.classList.add('open');
+    map.panTo([task.lat, task.lng]);
+  }
+  document.getElementById('cardClose').onclick = () => card.classList.remove('open');
+  document.getElementById('cardAdd').onclick = () => {
+    if(!activeTask) return;
+    toggleTask(activeTask.id);
+    document.getElementById('cardAdd').textContent = selected.has(activeTask.id) ? "Remove from route" : "Add to today's route";
+    card.classList.remove('open');
+  };
+  document.getElementById('cardDirections').onclick = () => {
+    if(!activeTask) return;
+    window.open(`https://www.google.com/maps/dir/?api=1&destination=${activeTask.lat},${activeTask.lng}`, '_blank');
+  };
+
+  // ---------- Toggle add/remove ----------
+  function toggleTask(id){
+    const task = tasks.find(t => t.id === id);
+    if(selected.has(id)){
+      selected.delete(id);
+      const idx = addedOrder.indexOf(id);
+      if(idx > -1) addedOrder.splice(idx,1);
+    } else {
+      selected.add(id);
+      addedOrder.push(id);
+    }
+    refreshPin(task);
+    renderRoute();
+    renderNearby();
+    drawTrail();
+  }
+
+  // ---------- Route section (lower part of page) ----------
+  function renderRoute(){
+    const body = document.getElementById('routeBody');
+    document.getElementById('routeCount').textContent = `${selected.size} stop${selected.size===1?'':'s'}`;
+    if(selected.size === 0){
+      body.innerHTML = `<div class="route-empty">Add a task from the map or the list below to start building today's route.</div>`;
+      return;
+    }
+    const chosen = addedOrder.map(id => tasks.find(t => t.id === id));
+    const totalXP = chosen.reduce((s,t) => s + t.xp, 0);
+    const totalTime = chosen.reduce((s,t) => s + parseInt(t.time), 0);
+    body.innerHTML = `
+      <div class="route-list">
+        ${chosen.map(t => `
+          <div class="item">
+            <div class="icon">${t.icon}</div>
+            <div class="info" data-id="${t.id}">
+              <h4>${t.name}</h4>
+              <div class="meta">${t.dist} · ${t.time} · +${t.xp} XP</div>
+            </div>
+            <button class="icon-btn remove" data-remove="${t.id}">✕</button>
+          </div>
+        `).join('')}
+      </div>
+      <div class="route-footer">
+        <div>
+          <div class="sub">walking in order added</div>
+        </div>
+        <div class="total-xp">+${totalXP} XP · ~${totalTime} min</div>
+      </div>
+    `;
+    body.querySelectorAll('[data-remove]').forEach(btn => {
+      btn.addEventListener('click', () => toggleTask(parseInt(btn.dataset.remove)));
+    });
+    body.querySelectorAll('.info').forEach(el => {
+      el.addEventListener('click', () => openCard(tasks.find(t => t.id === parseInt(el.dataset.id))));
+    });
+  }
+
+  // ---------- Nearby section ----------
+  function renderNearby(){
+    const list = document.getElementById('nearbyList');
+    document.getElementById('nearbyCount').textContent = `${tasks.length} tasks`;
+    list.innerHTML = tasks.map(t => `
+      <div class="item">
+        <div class="icon">${t.icon}</div>
+        <div class="info" data-id="${t.id}">
+          <h4>${t.name}</h4>
+          <div class="meta">${t.dist} · ${t.time} · +${t.xp} XP</div>
+        </div>
+        <button class="icon-btn ${selected.has(t.id) ? 'added' : 'add'}" data-toggle="${t.id}">${selected.has(t.id) ? '✓' : '+'}</button>
+      </div>
+    `).join('');
+    list.querySelectorAll('[data-toggle]').forEach(btn => {
+      btn.addEventListener('click', () => toggleTask(parseInt(btn.dataset.toggle)));
+    });
+    list.querySelectorAll('.info').forEach(el => {
+      el.addEventListener('click', () => openCard(tasks.find(t => t.id === parseInt(el.dataset.id))));
+    });
+  }
+
+  // ---------- Trail on map ----------
+  function drawTrail(){
+    if(trailLine){ map.removeLayer(trailLine); trailLine = null; }
+    if(addedOrder.length < 2) return;
+    const points = addedOrder.map(id => {
+      const t = tasks.find(x => x.id === id);
+      return [t.lat, t.lng];
+    });
+    trailLine = L.polyline(points, {
+      color:'#8B7FD9', weight:3, dashArray:'2,10', lineCap:'round', opacity:0.9
+    }).addTo(map);
+  }
+
+  renderRoute();
+  renderNearby();
+</script>
+
+</body>
+</html>
